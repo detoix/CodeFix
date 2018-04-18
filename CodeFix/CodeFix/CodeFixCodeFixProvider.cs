@@ -44,15 +44,22 @@ namespace CodeFix
         {
             if (constructor is ConstructorDeclarationSyntax declaration)
             {
-                var parameters = declaration.ParameterList.Parameters;
+                var existingAssignments = new HashSet<SyntaxToken>(
+                    declaration.Body.Statements.GetIdentifiers(),
+                    new IdentifiersEqualityComparer());
+
+                var parameters = declaration
+                    .ParameterList
+                    .Parameters
+                    .Where(e => !existingAssignments.Contains(e.Identifier));
                 var properties = parameters.Select(e => e.ConvertToProperty()).ToArray();
                 var assignments = parameters
-                    .Zip(properties, (parameter, property) => parameter.AssignTo(property))
-                    .ToArray();
+                    .Zip(properties, (parameter, property) => parameter.AssignTo(property));
                 var syntaxTree = await document
                     .GetSyntaxTreeAsync(cancellationToken);
+
                 var newConstructor = declaration
-                    .WithBody(declaration.Body.AddStatements(assignments));
+                    .WithBody(declaration.Body.AddStatements(assignments.ToArray()));
 
                 var newSyntaxTree = syntaxTree
                     .GetRoot()
@@ -89,7 +96,22 @@ namespace CodeFix
                     SyntaxFactory.IdentifierName(property.Identifier),
                     SyntaxFactory.IdentifierName(parameter.Identifier)));
 
+        public static IEnumerable<SyntaxToken> GetIdentifiers(this IEnumerable<StatementSyntax> expressions)
+            => expressions.OfType<ExpressionStatementSyntax>()
+                .Select(e => e.Expression)
+                .OfType<AssignmentExpressionSyntax>()
+                .SelectMany(e => new ExpressionSyntax[] { e.Left, e.Right })
+                .OfType<IdentifierNameSyntax>()
+                .Select(e => e.Identifier);
+
         public static string CapitalizeFirstLetter(this string s)
             => char.ToUpper(s[0]) + s.Substring(1);
+    }
+
+    public class IdentifiersEqualityComparer : IEqualityComparer<SyntaxToken>
+    {
+        public bool Equals(SyntaxToken x, SyntaxToken y) => x.Text == y.Text;
+
+        public int GetHashCode(SyntaxToken obj) => obj.Text.GetHashCode();
     }
 }

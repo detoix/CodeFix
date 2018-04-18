@@ -115,12 +115,12 @@ namespace CodeFix.Test
             {
                 public string Arg { get; }
                 public int MyProperty { get; protected internal set; }
-                public bool IsOK { get; }
+    public bool IsOK { get; }
 
     public Class(string arg, int myProperty, bool isOK)
                 {
-        Arg = arg;
-        MyProperty = myProperty;
+                    Arg = arg;
+                    MyProperty = myProperty;
         IsOK = isOK;
     }
             }";

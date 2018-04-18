@@ -10,64 +10,66 @@ using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Rename;
-using Microsoft.CodeAnalysis.Text;
 
 namespace CodeFix
 {
     [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(CodeFixCodeFixProvider)), Shared]
     public class CodeFixCodeFixProvider : CodeFixProvider
     {
-        private const string title = "Make uppercase";
-
         public sealed override ImmutableArray<string> FixableDiagnosticIds
-        {
-            get { return ImmutableArray.Create(CodeFixAnalyzer.DiagnosticId); }
-        }
+            => ImmutableArray.Create(CodeFixAnalyzer.DiagnosticId);
 
         public sealed override FixAllProvider GetFixAllProvider()
-        {
-            // See https://github.com/dotnet/roslyn/blob/master/docs/analyzers/FixAllProvider.md for more information on Fix All Providers
-            return WellKnownFixAllProviders.BatchFixer;
-        }
+            => WellKnownFixAllProviders.BatchFixer;
 
         public sealed override async Task RegisterCodeFixesAsync(CodeFixContext context)
         {
-            var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
+            var root = await context
+                .Document
+                .GetSyntaxRootAsync(context.CancellationToken)
+                .ConfigureAwait(false);
 
-            // TODO: Replace the following code with your own analysis, generating a CodeAction for each fix to suggest
             var diagnostic = context.Diagnostics.First();
             var diagnosticSpan = diagnostic.Location.SourceSpan;
+            var declaration = root.FindToken(diagnosticSpan.Start).Parent;
 
-            // Find the type declaration identified by the diagnostic.
-            var declaration = root.FindToken(diagnosticSpan.Start).Parent.AncestorsAndSelf().OfType<TypeDeclarationSyntax>().First();
-
-            // Register a code action that will invoke the fix.
             context.RegisterCodeFix(
                 CodeAction.Create(
-                    title: title,
-                    createChangedSolution: c => MakeUppercaseAsync(context.Document, declaration, c), 
-                    equivalenceKey: title),
+                    "Update properties",
+                    e => UpdateProperties(context.Document, declaration, e)),
                 diagnostic);
         }
 
-        private async Task<Solution> MakeUppercaseAsync(Document document, TypeDeclarationSyntax typeDecl, CancellationToken cancellationToken)
+        private async Task<Document> UpdateProperties(Document document, SyntaxNode constructor, CancellationToken cancellationToken)
         {
-            // Compute new uppercase name.
-            var identifierToken = typeDecl.Identifier;
-            var newName = identifierToken.Text.ToUpperInvariant();
+            if (constructor is ConstructorDeclarationSyntax declaration)
+            {
+                var syntaxTree = await document
+                    .GetSyntaxTreeAsync(cancellationToken);
+                var newSyntaxTree = syntaxTree
+                    .GetRoot()
+                    .InsertNodesBefore(
+                        constructor,
+                        declaration.ParameterList.Parameters.Select(e => e.ConvertToProperty()));
 
-            // Get the symbol representing the type to be renamed.
-            var semanticModel = await document.GetSemanticModelAsync(cancellationToken);
-            var typeSymbol = semanticModel.GetDeclaredSymbol(typeDecl, cancellationToken);
+                document = document.WithSyntaxRoot(newSyntaxTree);
+            }
 
-            // Produce a new solution that has all references to that type renamed, including the declaration.
-            var originalSolution = document.Project.Solution;
-            var optionSet = originalSolution.Workspace.Options;
-            var newSolution = await Renamer.RenameSymbolAsync(document.Project.Solution, typeSymbol, newName, optionSet, cancellationToken).ConfigureAwait(false);
-
-            // Return the new solution with the now-uppercase type name.
-            return newSolution;
+            return document;
         }
+    }
+
+    public static class Helpers
+    {
+        public static PropertyDeclarationSyntax ConvertToProperty(this ParameterSyntax parameter)
+            => SyntaxFactory.PropertyDeclaration(parameter.Type, parameter.Identifier.Text.CapitalizeFirstLetter())
+                .AddModifiers(
+                    SyntaxFactory.Token(SyntaxKind.PublicKeyword))
+                .AddAccessorListAccessors(
+                    SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
+                        .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken)));
+
+        public static string CapitalizeFirstLetter(this string s)
+            => char.ToUpper(s[0]) + s.Substring(1);
     }
 }

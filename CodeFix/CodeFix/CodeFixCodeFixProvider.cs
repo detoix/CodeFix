@@ -44,15 +44,28 @@ namespace CodeFix
         {
             if (constructor is ConstructorDeclarationSyntax declaration)
             {
+                var parameters = declaration.ParameterList.Parameters;
+                var properties = parameters.Select(e => e.ConvertToProperty()).ToArray();
+                var assignments = parameters
+                    .Zip(properties, (parameter, property) => parameter.AssignTo(property))
+                    .ToArray();
                 var syntaxTree = await document
                     .GetSyntaxTreeAsync(cancellationToken);
+                var newConstructor = declaration
+                    .WithBody(declaration.Body.AddStatements(assignments));
+
                 var newSyntaxTree = syntaxTree
                     .GetRoot()
+                    .TrackNodes(constructor);
+                var withProperties = newSyntaxTree
                     .InsertNodesBefore(
-                        constructor,
-                        declaration.ParameterList.Parameters.Select(e => e.ConvertToProperty()));
+                        newSyntaxTree.GetCurrentNode(constructor),
+                        properties);
+                var withAssignments = withProperties.ReplaceNode(
+                        withProperties.GetCurrentNode(constructor),
+                        newConstructor);
 
-                document = document.WithSyntaxRoot(newSyntaxTree);
+                document = document.WithSyntaxRoot(withAssignments);
             }
 
             return document;
@@ -68,6 +81,13 @@ namespace CodeFix
                 .AddAccessorListAccessors(
                     SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
                         .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken)));
+
+        public static StatementSyntax AssignTo(this ParameterSyntax parameter, PropertyDeclarationSyntax property)
+            => SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.AssignmentExpression(
+                    SyntaxKind.SimpleAssignmentExpression,
+                    SyntaxFactory.IdentifierName(property.Identifier),
+                    SyntaxFactory.IdentifierName(parameter.Identifier)));
 
         public static string CapitalizeFirstLetter(this string s)
             => char.ToUpper(s[0]) + s.Substring(1);

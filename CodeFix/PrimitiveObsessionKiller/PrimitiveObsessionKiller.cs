@@ -19,7 +19,7 @@ namespace PrimitiveObsessionKiller
     {
         private const string Message = "Primitive types are not allowed in this method";
 
-        private static readonly ISet<SpecialType> DisallowedTypes = new[]
+        private static readonly ImmutableHashSet<SpecialType> DisallowedTypes = new[]
         {
             SpecialType.System_Boolean,
             SpecialType.System_Byte,
@@ -77,10 +77,9 @@ namespace PrimitiveObsessionKiller
                 var methodDecoratedWithAttribute = context.Node.FirstAncestorOrSelf<BaseMethodDeclarationSyntax>();
                 var typesOfMethodArguments = methodDecoratedWithAttribute.ParameterList.Parameters
                     .Select(e => context.SemanticModel.GetDeclaredSymbol(e))
-                    .Select(e => e.Type.SpecialType)
-                    .ToImmutableHashSet();
-                var primitiveMethodArguments = typesOfMethodArguments
-                    .Intersect(DisallowedTypes);
+                    .Select(e => e.Type.SpecialType);
+                var primitiveMethodArguments = DisallowedTypes
+                    .Intersect(typesOfMethodArguments);
 
                 if (primitiveMethodArguments.Any())
                 {

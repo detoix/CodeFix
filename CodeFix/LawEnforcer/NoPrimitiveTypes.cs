@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-namespace PrimitiveObsessionKiller
+namespace LawEnforcer
 {
     [AttributeUsage(AttributeTargets.Constructor | AttributeTargets.Method)]
     public sealed class NoPrimitiveTypesAttribute : Attribute

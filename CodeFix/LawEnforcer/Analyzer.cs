@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-namespace PrimitiveObsessionKiller
+namespace LawEnforcer
 {
     public abstract class Analyzer<T> : DiagnosticAnalyzer
     {
@@ -12,7 +12,7 @@ namespace PrimitiveObsessionKiller
         public Analyzer(string id, string message)
         {
             this._rule = new DiagnosticDescriptor(
-                $"C{id}",
+                $"LE{id}",
                 message,
                 string.Empty,
                 string.Empty,

@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -19,13 +17,16 @@ namespace PrimitiveObsessionKiller
     }
 
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
-    public sealed class NoPrimitiveTypesAnalyzer : Analyzer
+    public sealed class NoPrimitiveTypesAnalyzer : Analyzer<NoPrimitiveTypesAttribute>
     {
-        private readonly ImmutableHashSet<SpecialType> _disallowedTypes;
-
         public NoPrimitiveTypesAnalyzer() : base("001", "Primitive types are not allowed in this method")
         {
-            this._disallowedTypes = new[]
+
+        }
+
+        protected override bool ContextViolatesRule(SyntaxNodeAnalysisContext context)
+        {
+            var disallowedTypes = new[]
             {
                 SpecialType.System_Boolean,
                 SpecialType.System_Byte,
@@ -44,32 +45,16 @@ namespace PrimitiveObsessionKiller
                 SpecialType.System_UInt16,
                 SpecialType.System_UInt32,
                 SpecialType.System_UInt64
-            }
-            .ToImmutableHashSet();
-        }
+            };
+            var methodDecoratedWithAttribute = context.Node.FirstAncestorOrSelf<BaseMethodDeclarationSyntax>();
+            var typesOfMethodArguments = methodDecoratedWithAttribute.ParameterList.Parameters
+                .Select(e => context.SemanticModel.GetDeclaredSymbol(e))
+                .Select(e => e.Type.SpecialType);
+            var primitiveMethodArguments = disallowedTypes
+                .Intersect(typesOfMethodArguments);
+            var anyPrimitiveArgument = primitiveMethodArguments.Any();
 
-        protected override void AnalyzeSyntaxNodeAndReportDiagnostics(SyntaxNodeAnalysisContext context)
-        {
-            var attributeIsOfProperType = context.SemanticModel.GetTypeInfo(context.Node).ConvertedType.Equals(
-                context.SemanticModel.Compilation.GetTypeByMetadataName(typeof(NoPrimitiveTypesAttribute).FullName)
-            );
-
-            if(attributeIsOfProperType)
-            {
-                var methodDecoratedWithAttribute = context.Node.FirstAncestorOrSelf<BaseMethodDeclarationSyntax>();
-                var typesOfMethodArguments = methodDecoratedWithAttribute.ParameterList.Parameters
-                    .Select(e => context.SemanticModel.GetDeclaredSymbol(e))
-                    .Select(e => e.Type.SpecialType);
-                var primitiveMethodArguments = this._disallowedTypes
-                    .Intersect(typesOfMethodArguments);
-
-                if (primitiveMethodArguments.Any())
-                {
-                    var problem = this.CreateDiagnostic(
-                        context.Node.GetLocation());
-                    context.ReportDiagnostic(problem);
-                }
-            }
+            return anyPrimitiveArgument;
         }
     }
 }

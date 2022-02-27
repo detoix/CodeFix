@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace PrimitiveObsessionKiller
 {
-    public abstract class Analyzer : DiagnosticAnalyzer
+    public abstract class Analyzer<T> : DiagnosticAnalyzer
     {
         private readonly DiagnosticDescriptor _rule;
 
@@ -36,11 +36,28 @@ namespace PrimitiveObsessionKiller
                 AnalyzeSyntaxNodeAndReportDiagnostics, SyntaxKind.Attribute);
         }
 
-        protected abstract void AnalyzeSyntaxNodeAndReportDiagnostics(SyntaxNodeAnalysisContext context);
-
-        protected Diagnostic CreateDiagnostic(Location location)
+        private void AnalyzeSyntaxNodeAndReportDiagnostics(SyntaxNodeAnalysisContext context)
         {
-            return Diagnostic.Create(
+            if(this.AttributeIsOfAnalyzedType(context) && this.ContextViolatesRule(context))
+            {
+                this.ReportViolation(context);
+            }
+        }
+
+        private bool AttributeIsOfAnalyzedType(SyntaxNodeAnalysisContext context)
+        {
+            var attributeIsOfProperType = context.SemanticModel.GetTypeInfo(context.Node).ConvertedType.Equals(
+                context.SemanticModel.Compilation.GetTypeByMetadataName(typeof(T).FullName)
+            );
+
+            return attributeIsOfProperType;
+        }
+
+        protected abstract bool ContextViolatesRule(SyntaxNodeAnalysisContext context);
+
+        private void ReportViolation(SyntaxNodeAnalysisContext context)
+        {
+            var diagnostics = Diagnostic.Create(
                 id: this._rule.Id,
                 category: this._rule.Category,
                 message: this._rule.Title,
@@ -48,8 +65,10 @@ namespace PrimitiveObsessionKiller
                 defaultSeverity: DiagnosticSeverity.Error,
                 isEnabledByDefault: true,
                 warningLevel: 0,
-                location: location
+                location: context.Node.GetLocation()
             );
+
+            context.ReportDiagnostic(diagnostics);
         }
     }
 }

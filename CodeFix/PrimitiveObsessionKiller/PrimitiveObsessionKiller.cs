@@ -51,14 +51,6 @@ namespace PrimitiveObsessionKiller
                 true,
                 Message);
 
-        private static readonly ImmutableArray<SyntaxKind> SyntaxKindsToRegister =
-            ImmutableArray.Create(
-                SyntaxKind.IdentifierName,
-                SyntaxKind.GenericName,
-                SyntaxKind.DefaultLiteralExpression
-            );
-
-
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
         public override void Initialize(AnalysisContext context)
@@ -82,61 +74,19 @@ namespace PrimitiveObsessionKiller
 
             if(attributeIsOfProperType)
             {
-                // var g = context.SemanticModel.GetSymbolInfo(context.Node);
-
-                // var desiredSymbol = context.SemanticModel.Compilation.GetTypeByMetadataName(typeof(PrimitiveObsessionKillerAttribute).FullName);
-
-
-
                 var methodDecoratedWithAttribute = context.Node.FirstAncestorOrSelf<BaseMethodDeclarationSyntax>();
-
-                // // var k = context.Node.Ancestors().First();
-
-                // var hs = context.SemanticModel.GetSymbolInfo(methodDecoratedWithAttribute);
-
-                // var hggg = methodDecoratedWithAttribute.ParameterList.Parameters.Select(e => context.SemanticModel.GetDeclaredSymbol(e)).ToArray();
-                // var jkk = hggg.Select(e => e.Type.is)
-
-                // var jj = context.SemanticModel.GetTypeInfo(k).Type.ToDisplayString();
-
-                // System.IO.File.AppendAllLines($"/home/detoix/Software/CodeFix/CodeFix/CodeFix/bin/Debug/{context.SemanticModel.GetTypeInfo(context.Node).Type.ToDisplayString()}", new[]
-                // {
-                //     context.ContainingSymbol.GetType().FullName,
-                //     context.Node.GetType().FullName,
-                //     // g.Symbol.GetType().FullName,
-                //     context.SemanticModel.GetTypeInfo(context.Node).Type.ToDisplayString(),
-                //     attributeIsOfProperType.ToString(),
-                //     context.Node.GetLocation().ToString(),
-                //     // k.GetType().FullName,
-                //     methodDecoratedWithAttribute.GetType().FullName,
-                //     // hs.ToString(),
-                //     "dupa"
-                //     // jj
-                // }
-                // .Concat(hggg.Select(e => e.Type.TypeKind.ToString()))
-                // .Concat(hggg.Select(e => e.Type.SpecialType.ToString()))
-                // // .Concat(context.Node.Ancestors().Select(e => e.GetType().FullName))
-                // // .Concat(h.ChildNodes().Select(e => e.GetType().FullName))
-                // // .Concat(context.Node.ChildNodes().Select(e => e.GetType().FullName))
-                // // .Concat(context.Node.DescendantNodes().Select(e => e.GetType().FullName))
-                // .ToArray());
-
-
                 var typesOfMethodArguments = methodDecoratedWithAttribute.ParameterList.Parameters
                     .Select(e => context.SemanticModel.GetDeclaredSymbol(e))
                     .Select(e => e.Type.SpecialType)
                     .ToImmutableHashSet();
-
-
                 var primitiveMethodArguments = typesOfMethodArguments
                     .Intersect(DisallowedTypes);
 
                 if (primitiveMethodArguments.Any())
                 {
-                    var problem = this.CreateDiagnostic(Rule, context.Node.GetLocation());
-
+                    var problem = this.CreateDiagnostic(
+                        Rule, context.Node.GetLocation());
                     context.ReportDiagnostic(problem);
-
                 }
             }
         }
